@@ -32,11 +32,14 @@ namespace Mosaic
         private void button1_Click_1(object sender, EventArgs e)
         {
             Bitmap big = new Bitmap(128, 128);
-            textBox2.Text = string.Join("\r\n", GetDot(textBox1.Text,
+            var rst = GetDot(textBox1.Text,
                 (int)numericUpDown1.Value,
                 (int)numericUpDown2.Value,
                 comboBox1.Text,
-                (int)numericUpDown3.Value, out big).Select(r => r.maping).ToArray());
+                (int)numericUpDown3.Value, out big);
+            textBox2.Text = string.Join("\r\n", rst.Select(r => r.maping).ToArray());
+
+            rst.ForEach(r => textBox3.Text += r.Make() + "\r\n");
             pictureBox1.Image = big;
         }
 
@@ -69,7 +72,11 @@ namespace Mosaic
         private int width, height, fontsize;
         private string fontname;
         private char _c;
-        public MatrixWord() { }
+
+        public MatrixWord()
+        {
+        }
+
         public MatrixWord(char c, int Width, int Height, String FontName, int FontSize)
         {
             width = Width;
@@ -81,19 +88,34 @@ namespace Mosaic
             this.word = c;
             this.maping = _t.maping;
             this.square = _t.square;
+            this.hexArr = _t.hexArr;
         }
+
         public char word { get; set; }
         public Bitmap square { get; set; }
         public String maping { get; set; }
+        public List<Int32> hexArr { get; set; }
+
+        public String Make()
+        {
+            String command = "const uint8_t bitmap[] PROGMEM  = {";
+            List<string> arr = new List<string>();
+            foreach (int i in hexArr)
+                arr.Add(String.Format("0x{0:X}", i));
+            command += string.Join(",", arr) + "};";
+            return command;
+        }
 
         public MatrixWord Convert()
         {
             return Convert(_c, width, height, fontname, fontsize);
         }
+
         public MatrixWord Convert(char c)
         {
             return Convert(c, width, height, fontname, fontsize);
         }
+
         /// <summary>
         /// 转换
         /// </summary>
@@ -116,25 +138,41 @@ namespace Mosaic
             g.Flush();
             //pictureBox1.Image = new Bitmap(b, 128, 128);
             string DotMartix = "";
-            //string c#
+            List<Int32> hexList = new List<int>();
             for (int y = 0; y < b.Height; y++)
             {
                 string Line = "";
+                int hex = 0;
                 for (int x = 0; x < b.Width; x++)
                 {
-                    Line += (b.GetPixel(x, y).Name != "0" ? "●" : "○") + " ";
+                    if (b.GetPixel(x, y).Name != "0")
+                    {
+                        Line += "● ";
+                        hex += 1 << (7 - x % 8);
+                    }
+                    else
+                    {
+                        Line += "○ ";
+                    }
+                    //8个bit分割
+                    if ((x + 1) % 8 == 0)
+                    {
+                        hexList.Add(hex);
+                        hex = 0;
+                    }
                 }
+
                 DotMartix += Line + "\r\n";
             }
             MatrixWord word = new MatrixWord
-            {
-                word = c,
-                square = b,
-                maping = DotMartix
-            };
-
-            return word;
+                {
+                    word = c,
+                    square = b,
+                    maping = DotMartix,
+                    hexArr = hexList
+                };
+                return word;
+            }
         }
-    }
 
-}
+    }
